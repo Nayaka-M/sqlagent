@@ -31,18 +31,25 @@ export default function QueryInterface({ databases }) {
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
+      
+      console.log('🔍 API Response:', res.data); // Debug log
+      
       setResult(res.data);
+      
       if (res.data.success) {
         if (res.data.explanation) {
           toast.info('SQL generated and explained!');
+        } else if (res.data.result && res.data.result.length > 0) {
+          toast.success(`Query executed! ${res.data.row_count} rows returned`);
         } else {
-          toast.success('Query executed successfully!');
+          toast.info('Query executed successfully! (0 rows)');
         }
       } else {
         toast.error(res.data.error || 'Query execution failed');
       }
       setPrompt('');
     } catch (err) {
+      console.error('❌ Error:', err);
       toast.error(err.response?.data?.detail || 'Failed to process query');
     }
     setLoading(false);
@@ -144,7 +151,7 @@ export default function QueryInterface({ databases }) {
               onChange={(e) => setSelectedDb(e.target.value)}
               className="px-4 py-2.5 bg-[#1a1a2e] border border-gray-700 rounded-xl text-white focus:outline-none focus:border-[#6C63FF] min-w-[180px]"
             >
-              <option value="">All Databases</option>
+              <option value="">All Databases (Explain Only)</option>
               {databases.map((db) => (
                 <option key={db.id} value={db.id}>
                   {db.db_name}
@@ -165,7 +172,7 @@ export default function QueryInterface({ databases }) {
               ) : (
                 <>
                   <Sparkles className="w-4 h-4" />
-                  Generate & Execute
+                  {selectedDb ? 'Generate & Execute' : 'Generate & Explain'}
                   <Send className="w-4 h-4" />
                 </>
               )}
@@ -206,13 +213,13 @@ export default function QueryInterface({ databases }) {
                   </div>
                 </div>
                 <div className="mt-3 text-xs text-gray-500">
-                  💡 Select a database to execute this query and see results!
+                  💡 Select a database from the dropdown to execute this query and see results!
                 </div>
               </div>
             )}
 
-            {/* ✅ Results - only when executed and data exists */}
-            {result.result && !result.explanation && result.result.length > 0 && (
+            {/* ✅ Results - only when database is selected and data exists */}
+            {result.result && !result.explanation && Array.isArray(result.result) && result.result.length > 0 && (
               <div className="border border-gray-700 rounded-xl overflow-hidden">
                 <div className="bg-[#1a1a2e] px-4 py-2 text-sm font-medium text-gray-300 flex items-center justify-between">
                   <span>Results ({result.row_count} rows)</span>
@@ -263,6 +270,13 @@ export default function QueryInterface({ databases }) {
                     </div>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* ✅ Show message when query returns 0 rows */}
+            {result.result && !result.explanation && Array.isArray(result.result) && result.result.length === 0 && (
+              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 text-yellow-400 text-sm">
+                Query executed successfully! No rows returned.
               </div>
             )}
 
