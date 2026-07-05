@@ -1,28 +1,15 @@
-# Core
 fastapi==0.115.6
 uvicorn==0.34.0
 python-dotenv==1.0.1
-
-# Database
+pydantic==2.10.4
+pydantic-core==2.27.2
+python-multipart==0.0.20
 asyncpg==0.29.0
 psycopg2-binary==2.9.9
-
-# AI/LLM
+openpyxl==3.1.5
+websockets==13.1
 google-generativeai==0.8.3
-
-# Authentication
 python-jose==3.3.0
 passlib==1.7.4
 bcrypt==4.1.2
-
-# Data Processing
-pydantic==2.10.4
-python-multipart==0.0.20
-openpyxl==3.1.5
-
-# Real-time
-websockets==13.1
-python-socketio==5.11.0
-
-# Utils
 cryptography==42.0.0
