@@ -139,7 +139,7 @@ manager = ConnectionManager()
 @app.websocket("/ws/{user_id}")
 async def websocket_endpoint(websocket: WebSocket, user_id: str):
     await manager.connect(websocket, user_id)
-    
+
     await manager.send_personal_message({
         "type": "connection",
         "message": "Connected to real-time server",
@@ -178,16 +178,16 @@ async def send_realtime_notification(user_id: str, title: str, message: str, typ
 async def get_current_user(authorization: Optional[str] = Header(None)):
     if not authorization:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    
+
     parts = authorization.split()
     if len(parts) != 2 or parts[0].lower() != "bearer":
         raise HTTPException(status_code=401, detail="Invalid token format")
-    
+
     token = parts[1]
     user = await verify_token(token)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
+
     return user
 
 # ============================================================
@@ -195,40 +195,86 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
 # ============================================================
 
 def generate_sql_fallback(prompt: str, db_id: str = None) -> str:
+    """
+    Rule-based SQL generator used when Gemini is unavailable or fails.
+
+    IMPORTANT: order matters here. Specific-intent checks (top N, totals,
+    counts, stock) must run BEFORE generic entity-name checks (user/order/
+    product), otherwise a query like "List top 5 customers" gets caught by
+    the generic "customer" check and returns the wrong SQL. This was the
+    root cause of every query returning the same result.
+    """
     p = prompt.lower()
     USER_TABLE = "users"
     ORDER_TABLE = "orders"
     PRODUCT_TABLE = "products"
-    
+
+    print(f"🔍 FALLBACK - Prompt: {p}")
+
+    # 1. Table/schema meta-queries — most specific, check first
     if "show me all tables" in p or "list tables" in p:
         return "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name;"
     if "describe" in p or "columns" in p:
         return f"SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'public' AND table_name = '{USER_TABLE}' ORDER BY column_name;"
-    if "user" in p or "customer" in p:
-        return f"SELECT * FROM {USER_TABLE} ORDER BY created_at DESC LIMIT 20;"
+
+    # 2. Top N queries — must come before generic "customer"/"user"/"order" checks
+    if "top" in p and ("customer" in p or "order" in p):
+        return f"SELECT customer_id, SUM(amount) as total_spent FROM {ORDER_TABLE} GROUP BY customer_id ORDER BY total_spent DESC LIMIT 5;"
+    if "top" in p and "product" in p:
+        return f"SELECT * FROM {PRODUCT_TABLE} ORDER BY price DESC LIMIT 5;"
+    if "top" in p and "user" in p:
+        return f"SELECT * FROM {USER_TABLE} ORDER BY created_at DESC LIMIT 5;"
+
+    # 3. Aggregate/revenue queries — before generic "order" check
+    if "total" in p or "revenue" in p or ("sum" in p and "order" in p):
+        return f"SELECT SUM(amount) as total_revenue, COUNT(*) as total_orders FROM {ORDER_TABLE};"
+
+    # 4. Count queries
+    if "count" in p or "how many" in p:
+        target = ORDER_TABLE if "order" in p else (PRODUCT_TABLE if "product" in p else USER_TABLE)
+        return f"SELECT COUNT(*) as total_records FROM {target};"
+
+    # 5. Stock queries — before generic "product" check
+    if "out of stock" in p or "stock = 0" in p:
+        return f"SELECT * FROM {PRODUCT_TABLE} WHERE stock = 0;"
+
+    # 6. Generic entity listing — checked LAST since these are broad keyword matches
     if "order" in p or "sale" in p:
         return f"SELECT * FROM {ORDER_TABLE} ORDER BY created_at DESC LIMIT 20;"
-    if "total" in p or "revenue" in p:
-        return f"SELECT SUM(amount) as total_revenue, COUNT(*) as total_orders FROM {ORDER_TABLE};"
-    if "count" in p or "how many" in p:
-        return f"SELECT COUNT(*) as total_records FROM {USER_TABLE};"
+    if "product" in p:
+        return f"SELECT * FROM {PRODUCT_TABLE} LIMIT 20;"
+    if "user" in p or "customer" in p:
+        return f"SELECT * FROM {USER_TABLE} ORDER BY created_at DESC LIMIT 20;"
+
+    print("⚠️ No conditions matched, returning default")
     return f"SELECT * FROM {USER_TABLE} LIMIT 20;"
 
 async def generate_sql_with_ai(prompt: str, db_id: str = None) -> str:
     """Generate SQL using AI with prompt engineering"""
+    print(f"🔍 AI GENERATE - Prompt: {prompt}")
+    print(f"🔍 AI GENERATE - Gemini Model: {gemini_model}")
+
     if not gemini_model:
-        return generate_sql_fallback(prompt, db_id)
-    
+        print("⚠️ Using fallback because gemini_model is None")
+        sql = generate_sql_fallback(prompt, db_id)
+        print(f"🔍 Fallback SQL: {sql}")
+        return sql
+
     try:
         # Use the prompt engineering template
         full_prompt = get_sql_generation_prompt(prompt)
+        print(f"🔍 Full prompt: {full_prompt[:100]}...")
+
         response = gemini_model.generate_content(full_prompt)
         sql = response.text.strip()
         sql = sql.replace('```sql', '').replace('```', '').strip()
+        print(f"🔍 AI Generated SQL: {sql}")
         return sql
     except Exception as e:
-        print(f"AI Error: {e}")
-        return generate_sql_fallback(prompt, db_id)
+        print(f"❌ AI Error: {e}")
+        sql = generate_sql_fallback(prompt, db_id)
+        print(f"🔍 Fallback SQL after error: {sql}")
+        return sql
 
 # ============================================================
 # SQL EXPLANATION FUNCTION
@@ -243,9 +289,9 @@ async def explain_sql_query(sql_query: str, prompt: str) -> str:
                 return response.text.strip()
             except Exception as e:
                 print(f"AI Explanation error: {e}")
-        
+
         return generate_basic_explanation(sql_query, prompt)
-        
+
     except Exception as e:
         print(f"Explanation error: {e}")
         return f"This query was generated based on your request: '{prompt}'. Please select a database to execute it."
@@ -254,7 +300,7 @@ def generate_basic_explanation(sql_query: str, prompt: str) -> str:
     """Generate a basic explanation without AI"""
     explanation_parts = []
     sql_lower = sql_query.lower()
-    
+
     if sql_lower.startswith("select"):
         if "count" in sql_lower:
             explanation_parts.append("📊 Counts the number of records")
@@ -268,39 +314,39 @@ def generate_basic_explanation(sql_query: str, prompt: str) -> str:
             explanation_parts.append("📈 Finds the minimum value")
         else:
             explanation_parts.append("🔍 Retrieves data from the database")
-    
+
     from_match = re.search(r'from\s+([^\s,;]+)', sql_lower, re.IGNORECASE)
     if from_match:
         table_name = from_match.group(1)
         explanation_parts.append(f"📋 From the '{table_name}' table")
-    
+
     where_match = re.search(r'where\s+(.+?)(?:group by|order by|limit|$)', sql_lower, re.IGNORECASE | re.DOTALL)
     if where_match:
         condition = where_match.group(1).strip()
         explanation_parts.append(f"🔍 Filtering where: {condition}")
-    
+
     if "order by" in sql_lower:
         order_match = re.search(r'order by\s+([^\s,;]+)', sql_lower, re.IGNORECASE)
         if order_match:
             order_by = order_match.group(1)
             direction = "descending" if "desc" in sql_lower else "ascending"
             explanation_parts.append(f"📊 Sorted by {order_by} ({direction})")
-    
+
     if "limit" in sql_lower:
         limit_match = re.search(r'limit\s+(\d+)', sql_lower, re.IGNORECASE)
         if limit_match:
             limit_val = limit_match.group(1)
             explanation_parts.append(f"📦 Limited to {limit_val} results")
-    
+
     explanation = f"📝 SQL Query Explanation\n\n"
     explanation += f"Your Request: \"{prompt}\"\n\n"
     explanation += "What this query does:\n"
     for i, part in enumerate(explanation_parts, 1):
         explanation += f"  {i}. {part}\n"
-    
+
     explanation += f"\n\nGenerated SQL:\n{sql_query}\n\n"
     explanation += "💡 Tip: Select a database to execute this query and see results!"
-    
+
     return explanation
 
 # ============================================================
@@ -315,24 +361,24 @@ async def export_to_excel(
         wb = openpyxl.Workbook()
         ws = wb.active
         ws.title = "Query Results"
-        
+
         header_font = Font(bold=True, color="FFFFFF")
         header_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
         header_alignment = Alignment(horizontal="center")
-        
+
         columns = data.get("columns", [])
         rows = data.get("rows", [])
-        
+
         if not columns and rows:
             columns = list(rows[0].keys()) if rows else []
-        
+
         for col_idx, col_name in enumerate(columns, 1):
             cell = ws.cell(row=1, column=col_idx)
             cell.value = col_name
             cell.font = header_font
             cell.fill = header_fill
             cell.alignment = header_alignment
-        
+
         for row_idx, row_data in enumerate(rows, 2):
             for col_idx, col_name in enumerate(columns, 1):
                 cell = ws.cell(row=row_idx, column=col_idx)
@@ -345,7 +391,7 @@ async def export_to_excel(
                     cell.value = str(value)
                 else:
                     cell.value = str(value)
-        
+
         for col_idx, col_name in enumerate(columns, 1):
             max_length = len(str(col_name))
             for row_idx in range(2, min(len(rows) + 2, 101)):
@@ -353,13 +399,13 @@ async def export_to_excel(
                 if cell_value:
                     max_length = max(max_length, len(str(cell_value)))
             ws.column_dimensions[openpyxl.utils.get_column_letter(col_idx)].width = min(max_length + 2, 50)
-        
+
         output = io.BytesIO()
         wb.save(output)
         output.seek(0)
-        
+
         filename = f"query_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-        
+
         return StreamingResponse(
             output,
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -391,21 +437,21 @@ async def contact_form(
     try:
         if not name or not email or not message:
             raise HTTPException(status_code=400, detail="All fields are required")
-        
+
         print(f"📧 Contact Form Submission:")
         print(f"   Name: {name}")
         print(f"   Email: {email}")
         print(f"   Subject: {subject}")
         print(f"   Message: {message}")
         print(f"   From User: {current_user['id']}")
-        
+
         await send_realtime_notification(
             current_user["id"],
             "Contact Form Submitted",
             f"Thank you {name}, we'll get back to you soon!",
             "success"
         )
-        
+
         return {
             "success": True,
             "message": "Message received! We'll get back to you soon.",
@@ -416,7 +462,7 @@ async def contact_form(
                 "message": message[:100] + "..."
             }
         }
-            
+
     except Exception as e:
         print(f"❌ Contact form error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -514,14 +560,14 @@ async def add_database_connection(
             db_data=db_data.dict()
         )
         print(f"✅ Database saved with ID: {db_id}")
-        
+
         await send_realtime_notification(
             current_user["id"],
             "Database Connected",
             f"✅ Connected to {db_data.db_name}",
             "success"
         )
-        
+
         return DatabaseConnectionResponse(
             id=db_id,
             db_name=db_data.db_name,
@@ -555,35 +601,35 @@ async def update_database_connection(
 ):
     try:
         from .database import get_connection, encrypt_password
-        
+
         existing = await get_database_connection(db_id, current_user["id"])
         if not existing:
             raise HTTPException(status_code=404, detail="Database connection not found")
-        
+
         conn = await get_connection()
-        
+
         password_to_save = db_data.password if db_data.password else existing["password"]
         if db_data.password:
             password_to_save = encrypt_password(db_data.password)
-        
+
         await conn.execute(
-            """UPDATE user_databases 
-               SET db_name = $1, db_type = $2, host = $3, port = $4, 
-                   username = $5, password = $6, database_name = $7 
+            """UPDATE user_databases
+               SET db_name = $1, db_type = $2, host = $3, port = $4,
+                   username = $5, password = $6, database_name = $7
                WHERE id = $8 AND user_id = $9""",
             db_data.db_name, db_data.db_type, db_data.host, db_data.port,
             db_data.username, password_to_save, db_data.database_name,
             db_id, current_user["id"]
         )
         await conn.close()
-        
+
         await send_realtime_notification(
             current_user["id"],
             "Database Updated",
             f"✅ Updated {db_data.db_name}",
             "success"
         )
-        
+
         return {"message": "Database updated successfully"}
     except Exception as e:
         print(f"❌ Error updating database: {e}")
@@ -602,17 +648,17 @@ async def delete_database_connection(
             db_id, current_user["id"]
         )
         await conn.close()
-        
+
         if result == "DELETE 0":
             raise HTTPException(status_code=404, detail="Database connection not found")
-        
+
         await send_realtime_notification(
             current_user["id"],
             "Database Deleted",
             "🗑️ Database connection removed",
             "info"
         )
-        
+
         return {"message": "Database deleted successfully"}
     except Exception as e:
         print(f"❌ Error deleting database: {e}")
@@ -629,26 +675,26 @@ async def process_query(
     try:
         if not request.prompt or not request.prompt.strip():
             raise HTTPException(status_code=400, detail="Prompt is required")
-        
+
         await send_realtime_notification(
             current_user["id"],
             "Query Started",
             f"Processing: {request.prompt[:50]}...",
             "info"
         )
-        
+
         sql_query = await generate_sql_with_ai(request.prompt, request.db_id)
-        
+
         result_data = None
         error_msg = None
         execution_time = None
         row_count = 0
         explanation = None
-        
+
         # ✅ Case 1: No database selected -> Show explanation only
         if not request.db_id or request.db_id == "all":
             explanation = await explain_sql_query(sql_query, request.prompt)
-            
+
             log = await create_log(
                 user_id=current_user["id"],
                 prompt=request.prompt,
@@ -658,7 +704,7 @@ async def process_query(
                 execution_time=None,
                 db_id=None
             )
-            
+
             return QueryResponse(
                 success=True,
                 sqlQuery=sql_query,
@@ -670,12 +716,12 @@ async def process_query(
                 explanation=explanation,
                 message="SQL generated and explained! Select a database to execute."
             )
-        
+
         # ✅ Case 2: Database selected but not connected
         db_config = await get_database_connection(request.db_id, current_user["id"])
         if not db_config:
             explanation = await explain_sql_query(sql_query, request.prompt)
-            
+
             log = await create_log(
                 user_id=current_user["id"],
                 prompt=request.prompt,
@@ -685,7 +731,7 @@ async def process_query(
                 execution_time=None,
                 db_id=request.db_id
             )
-            
+
             return QueryResponse(
                 success=False,
                 sqlQuery=sql_query,
@@ -697,7 +743,7 @@ async def process_query(
                 explanation=explanation,
                 message="Database not connected. Here's the SQL explanation."
             )
-        
+
         # ✅ Case 3: Database connected -> Execute query
         await send_realtime_notification(
             current_user["id"],
@@ -705,28 +751,28 @@ async def process_query(
             "Running on your database...",
             "info"
         )
-        
+
         exec_result = await execute_query(
             db_type=db_config["db_type"],
             config=db_config,
             query=sql_query
         )
-        
+
         if exec_result.get("success"):
             result_data = exec_result.get("data", [])
-            
+
             if isinstance(result_data, str):
                 try:
                     result_data = json.loads(result_data)
                 except:
                     result_data = []
-            
+
             if not isinstance(result_data, list):
                 result_data = [result_data] if result_data else []
-            
+
             row_count = exec_result.get("row_count", len(result_data))
             execution_time = exec_result.get("execution_time")
-            
+
             await send_realtime_notification(
                 current_user["id"],
                 "Query Complete!",
@@ -741,7 +787,7 @@ async def process_query(
                 f"❌ {error_msg[:100]}" if error_msg else "Query failed",
                 "error"
             )
-        
+
         log = await create_log(
             user_id=current_user["id"],
             prompt=request.prompt,
@@ -751,7 +797,7 @@ async def process_query(
             execution_time=execution_time,
             db_id=request.db_id
         )
-        
+
         return QueryResponse(
             success=not error_msg,
             sqlQuery=sql_query,
@@ -813,10 +859,10 @@ async def get_profile(
         user = await get_user_by_id(current_user["id"])
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
-        
+
         stats = await get_user_stats(current_user["id"])
         recent_logs = await get_logs(current_user["id"], 5)
-        
+
         return ProfileResponse(
             user=UserResponse(**user),
             total_queries=stats["total_queries"],
@@ -844,12 +890,12 @@ async def get_profile_stats(
 ):
     try:
         stats = await get_user_profile_stats(current_user["id"])
-        
+
         if not stats or not stats.get("user"):
             raise HTTPException(status_code=404, detail="User not found")
-        
+
         user = stats["user"]
-        
+
         user_data = UserResponse(
             id=user["id"],
             username=user["username"],
@@ -857,7 +903,7 @@ async def get_profile_stats(
             full_name=user.get("full_name"),
             created_at=user.get("created_at") or datetime.now().isoformat()
         )
-        
+
         recent_queries = []
         for log in stats["recent_queries"][:5]:
             recent_queries.append(
@@ -872,7 +918,7 @@ async def get_profile_stats(
                     execution_time=log.get("execution_time")
                 )
             )
-        
+
         return {
             "user": user_data,
             "stats": {
@@ -894,13 +940,13 @@ async def update_profile(
     try:
         if not profile_data.full_name or not profile_data.email:
             raise HTTPException(status_code=400, detail="Full name and email are required")
-        
+
         success = await update_user_profile(
             current_user["id"],
             profile_data.full_name,
             profile_data.email
         )
-        
+
         if success:
             await send_realtime_notification(
                 current_user["id"],
@@ -923,16 +969,16 @@ async def update_password_endpoint(
     try:
         if not password_data.current_password or not password_data.new_password:
             raise HTTPException(status_code=400, detail="Current and new password are required")
-        
+
         if len(password_data.new_password) < 6:
             raise HTTPException(status_code=400, detail="New password must be at least 6 characters")
-        
+
         success = await update_password(
             current_user["id"],
             password_data.current_password,
             password_data.new_password
         )
-        
+
         if success:
             await send_realtime_notification(
                 current_user["id"],
@@ -953,8 +999,8 @@ async def update_password_endpoint(
 @app.get("/health")
 async def health_check():
     return {
-        "status": "healthy", 
-        "database": "PostgreSQL", 
+        "status": "healthy",
+        "database": "PostgreSQL",
         "ai": "Gemini" if gemini_model else "Fallback",
         "realtime": "Enabled",
         "version": "2.0.0"
