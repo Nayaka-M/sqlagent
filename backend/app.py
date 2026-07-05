@@ -44,14 +44,25 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if GEMINI_API_KEY and GEMINI_AVAILABLE:
     try:
         genai.configure(api_key=GEMINI_API_KEY)
-        model_names = ['gemini-1.5-pro', 'gemini-pro', 'gemini-1.0-pro']
+        # NOTE: Google periodically renames/deprecates model IDs.
+        # If you see 404 errors like "models/gemini-1.5-pro is not found",
+        # run this to see what your API key currently supports:
+        #   curl "https://generativelanguage.googleapis.com/v1beta/models?key=YOUR_KEY"
+        # and update this list with whatever it returns.
+        model_names = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']
         gemini_model = None
         for model_name in model_names:
             try:
-                gemini_model = genai.GenerativeModel(model_name)
+                candidate = genai.GenerativeModel(model_name)
+                # Do a cheap real call to confirm the model actually works,
+                # since GenerativeModel(...) can succeed even for invalid names
+                # and only fails later on generate_content().
+                test_response = candidate.generate_content("ping")
+                gemini_model = candidate
                 print(f"✅ Gemini AI configured with: {model_name}")
                 break
-            except:
+            except Exception as model_err:
+                print(f"⚠️ Model {model_name} unavailable: {model_err}")
                 continue
         if not gemini_model:
             print("⚠️ No Gemini model available, using fallback")
@@ -196,13 +207,14 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
 
 def generate_sql_fallback(prompt: str, db_id: str = None) -> str:
     """
-    Rule-based SQL generator used when Gemini is unavailable or fails.
+    Rule-based SQL fallback used when Gemini is unavailable or fails.
 
-    IMPORTANT: order matters here. Specific-intent checks (top N, totals,
-    counts, stock) must run BEFORE generic entity-name checks (user/order/
-    product), otherwise a query like "List top 5 customers" gets caught by
-    the generic "customer" check and returns the wrong SQL. This was the
-    root cause of every query returning the same result.
+    IMPORTANT: order matters here. More specific intents (top N, totals,
+    counts, stock) must be checked BEFORE generic entity keywords
+    ("user", "customer", "order", "product") — otherwise a query like
+    "List top 5 customers" gets caught by the generic "customer" check
+    and incorrectly returns a plain SELECT * FROM users instead of the
+    aggregate query it should generate.
     """
     p = prompt.lower()
     USER_TABLE = "users"
@@ -231,14 +243,23 @@ def generate_sql_fallback(prompt: str, db_id: str = None) -> str:
 
     # 4. Count queries
     if "count" in p or "how many" in p:
-        target = ORDER_TABLE if "order" in p else (PRODUCT_TABLE if "product" in p else USER_TABLE)
+        if "order" in p:
+            target = ORDER_TABLE
+        elif "product" in p:
+            target = PRODUCT_TABLE
+        else:
+            target = USER_TABLE
         return f"SELECT COUNT(*) as total_records FROM {target};"
 
     # 5. Stock queries — before generic "product" check
-    if "out of stock" in p or "stock = 0" in p:
+    if "out of stock" in p or "stock = 0" in p or "no stock" in p:
         return f"SELECT * FROM {PRODUCT_TABLE} WHERE stock = 0;"
 
-    # 6. Generic entity listing — checked LAST since these are broad keyword matches
+    # 6. "Registered today" style date filters — before generic "user" check
+    if "registered today" in p or ("today" in p and "user" in p):
+        return f"SELECT * FROM {USER_TABLE} WHERE DATE(created_at) = CURRENT_DATE ORDER BY created_at DESC;"
+
+    # 7. Generic entity listing — checked LAST since these are broad keyword matches
     if "order" in p or "sale" in p:
         return f"SELECT * FROM {ORDER_TABLE} ORDER BY created_at DESC LIMIT 20;"
     if "product" in p:
@@ -246,6 +267,7 @@ def generate_sql_fallback(prompt: str, db_id: str = None) -> str:
     if "user" in p or "customer" in p:
         return f"SELECT * FROM {USER_TABLE} ORDER BY created_at DESC LIMIT 20;"
 
+    # 8. Default fallback
     print("⚠️ No conditions matched, returning default")
     return f"SELECT * FROM {USER_TABLE} LIMIT 20;"
 
