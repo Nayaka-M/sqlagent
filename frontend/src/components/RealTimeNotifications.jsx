@@ -13,7 +13,7 @@ export default function RealTimeNotifications() {
     if (!user) return;
 
     // Connect to WebSocket
-    const ws = new WebSocket(`ws://localhost:3001/ws/${user.id}`);
+   const ws = new WebSocket(`${import.meta.env.VITE_WS_URL || 'ws://localhost:3001'}/ws/${user.id}`);
     wsRef.current = ws;
 
     ws.onopen = () => {
