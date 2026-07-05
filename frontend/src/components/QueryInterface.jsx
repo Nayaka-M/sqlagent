@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import axios from 'axios';
 import toast, { Toaster } from 'react-hot-toast';
-import { Send, Loader2, Sparkles, Copy, Check, FileSpreadsheet } from 'lucide-react';
+import { Send, Loader2, Sparkles, Copy, Check, FileSpreadsheet, Info } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../config';
 
@@ -33,7 +33,11 @@ export default function QueryInterface({ databases }) {
       );
       setResult(res.data);
       if (res.data.success) {
-        toast.success('Query executed successfully!');
+        if (res.data.explanation) {
+          toast.info('SQL generated and explained!');
+        } else {
+          toast.success('Query executed successfully!');
+        }
       } else {
         toast.error(res.data.error || 'Query execution failed');
       }
@@ -171,6 +175,7 @@ export default function QueryInterface({ databases }) {
 
         {result && (
           <div className="mt-6 space-y-4">
+            {/* SQL Query */}
             <div className="bg-[#1a1a2e] rounded-xl p-4 border border-gray-700">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-medium text-[#6C63FF] flex items-center gap-2">
@@ -188,7 +193,26 @@ export default function QueryInterface({ databases }) {
               </pre>
             </div>
 
-            {result.result && result.result.length > 0 && (
+            {/* ✅ Show Explanation when no database selected */}
+            {result.explanation && (
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-6">
+                <div className="flex items-start gap-3">
+                  <Info className="w-5 h-5 text-blue-400 mt-1 flex-shrink-0" />
+                  <div>
+                    <h4 className="text-blue-400 font-medium mb-2">SQL Explanation</h4>
+                    <div className="text-gray-300 text-sm whitespace-pre-wrap">
+                      {result.explanation}
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-3 text-xs text-gray-500">
+                  💡 Select a database to execute this query and see results!
+                </div>
+              </div>
+            )}
+
+            {/* ✅ Results - only when executed and data exists */}
+            {result.result && !result.explanation && result.result.length > 0 && (
               <div className="border border-gray-700 rounded-xl overflow-hidden">
                 <div className="bg-[#1a1a2e] px-4 py-2 text-sm font-medium text-gray-300 flex items-center justify-between">
                   <span>Results ({result.row_count} rows)</span>

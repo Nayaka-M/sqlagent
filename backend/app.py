@@ -619,7 +619,7 @@ async def delete_database_connection(
         raise HTTPException(status_code=500, detail=str(e))
 
 # ============================================================
-# QUERY ENDPOINTS
+# QUERY ENDPOINTS - FIXED VERSION
 # ============================================================
 @app.post("/api/query", response_model=QueryResponse)
 async def process_query(
@@ -645,6 +645,7 @@ async def process_query(
         row_count = 0
         explanation = None
         
+        # ✅ FIX: Handle "All Databases" case
         if not request.db_id or request.db_id == "all":
             explanation = await explain_sql_query(sql_query, request.prompt)
             
@@ -652,7 +653,7 @@ async def process_query(
                 user_id=current_user["id"],
                 prompt=request.prompt,
                 sql_query=sql_query,
-                result={"explanation": explanation},
+                result=None,  # ✅ No result data for explanation
                 error=None,
                 execution_time=None,
                 db_id=None
@@ -662,14 +663,15 @@ async def process_query(
                 success=True,
                 sqlQuery=sql_query,
                 logId=log.id,
-                result={"explanation": explanation},
+                result=None,  # ✅ No result data
                 row_count=0,
                 execution_time=None,
                 error=None,
-                explanation=explanation,
+                explanation=explanation,  # ✅ Show explanation
                 message="SQL generated and explained! Select a database to execute."
             )
         
+        # ✅ Execute query if database is selected
         db_config = await get_database_connection(request.db_id, current_user["id"])
         if not db_config:
             raise HTTPException(status_code=404, detail="Database connection not found")
@@ -690,6 +692,7 @@ async def process_query(
         if exec_result.get("success"):
             result_data = exec_result.get("data", [])
             
+            # ✅ Ensure result_data is a list
             if isinstance(result_data, str):
                 try:
                     result_data = json.loads(result_data)
