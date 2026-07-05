@@ -8,20 +8,21 @@ async def execute_postgresql(config: dict, query: str):
     """Execute query on PostgreSQL database"""
     try:
         start_time = time.time()
-        
+
         conn = await asyncpg.connect(
             host=config['host'],
             port=config['port'],
             user=config['username'],
             password=config['password'],
-            database=config['database_name']
+            database=config['database_name'],
+            ssl='require'
         )
-        
+
         result = await conn.fetch(query)
         await conn.close()
-        
+
         execution_time = int((time.time() - start_time) * 1000)
-        
+
         data = []
         for row in result:
             row_dict = {}
@@ -44,7 +45,7 @@ async def execute_postgresql(config: dict, query: str):
                     except:
                         row_dict[key] = None
             data.append(row_dict)
-        
+
         return {
             "success": True,
             "data": data,
