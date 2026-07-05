@@ -1,0 +1,19 @@
+# Python 
+venv/ 
+__pycache__/ 
+*.pyc 
+.env 
+token.pickle 
+queries.db 
+*.log 
+.DS_Store 
+ECHO is on.
+# Node 
+node_modules/ 
+dist/ 
+.vite/ 
+.vercel/ 
+ECHO is on.
+# IDE 
+.vscode/ 
+.idea/ 

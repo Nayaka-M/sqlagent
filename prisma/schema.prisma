@@ -1,0 +1,18 @@
+generator client {
+  provider = "prisma-client-py"
+}
+
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+
+model QueryLog {
+  id        String   @id @default(uuid())
+  userId    String
+  prompt    String
+  sqlQuery  String
+  result    Json?
+  error     String?
+  createdAt DateTime @default(now())
+}
