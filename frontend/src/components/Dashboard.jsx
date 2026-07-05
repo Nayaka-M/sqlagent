@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { API_URL } from '../config';
 import Sidebar from './Sidebar';
 import QueryInterface from './QueryInterface';
 import LogsPanel from './LogsPanel';
@@ -9,14 +10,11 @@ import About from './About';
 import Terms from './Terms';
 import Privacy from './Privacy';
 import Features from './Features';
-import Pricing from './Pricing';
 import FAQ from './FAQ';
 import Contact from './Contact';
 import Support from './Support';
 import RealTimeNotifications from './RealTimeNotifications';
 import axios from 'axios';
-
-const API_URL = 'http://localhost:3001';
 
 export default function Dashboard() {
   const { user, logout, token } = useAuth();
@@ -53,12 +51,9 @@ export default function Dashboard() {
 
   return (
     <div className="flex min-h-screen bg-[#0F0E17]">
-      {/* Sidebar */}
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
 
-      {/* Main Content */}
       <div className="flex-1 overflow-auto">
-        {/* Header */}
         <header className="glass sticky top-0 z-50 border-b border-gray-800 px-8 py-4">
           <div className="flex items-center justify-between">
             <div>
@@ -79,7 +74,6 @@ export default function Dashboard() {
           </div>
         </header>
 
-        {/* Content */}
         <div className="p-8">
           {activeTab === 'query' && <QueryInterface databases={databases} />}
           {activeTab === 'history' && <LogsPanel />}

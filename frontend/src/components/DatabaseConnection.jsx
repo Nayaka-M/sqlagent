@@ -3,8 +3,7 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { Plus, Server, CheckCircle, Database, Edit2, Trash2, X } from 'lucide-react';
-
-const API_URL = 'https://sql-query-agent-backend.onrender.com';
+import { API_URL } from '../config';
 
 export default function DatabaseConnection({ databases, onRefresh }) {
   const { token } = useAuth();
@@ -36,13 +35,11 @@ export default function DatabaseConnection({ databases, onRefresh }) {
     setLoading(true);
     try {
       if (editingDb) {
-        // Update existing database
         await axios.put(`${API_URL}/api/databases/${editingDb.id}`, formData, {
           headers: { Authorization: `Bearer ${token}` }
         });
         toast.success('Database updated successfully! ✅');
       } else {
-        // Add new database
         await axios.post(`${API_URL}/api/databases`, formData, {
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -76,7 +73,7 @@ export default function DatabaseConnection({ databases, onRefresh }) {
       host: db.host,
       port: db.port,
       username: db.username,
-      password: '',  // Password is not shown, user needs to re-enter
+      password: '',
       database_name: db.database_name
     });
     setShowForm(true);

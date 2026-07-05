@@ -7,8 +7,7 @@ import {
 } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
-
-const API_URL = 'http://localhost:3001';
+import { API_URL } from '../config';
 
 export default function Profile() {
   const { user, token } = useAuth();
@@ -126,7 +125,6 @@ export default function Profile() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold gradient-text">Profile</h2>
@@ -141,7 +139,6 @@ export default function Profile() {
         </button>
       </div>
 
-      {/* Profile Card */}
       <div className="bg-[#1a1a2e] rounded-2xl border border-gray-700 overflow-hidden">
         <div className="h-24 bg-gradient-to-r from-[#6C63FF] to-[#FF6584] opacity-50"></div>
         
@@ -171,7 +168,6 @@ export default function Profile() {
         </div>
       </div>
 
-      {/* Edit Profile Form */}
       {isEditing && (
         <div className="bg-[#1a1a2e] rounded-2xl border border-[#6C63FF]/30 p-6">
           <div className="flex items-center justify-between mb-4">
@@ -230,7 +226,6 @@ export default function Profile() {
         </div>
       )}
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {statCards.map((stat, index) => (
           <div key={index} className="bg-[#1a1a2e] rounded-xl p-5 border border-gray-700">
@@ -247,7 +242,6 @@ export default function Profile() {
         ))}
       </div>
 
-      {/* Recent Queries */}
       {stats?.stats?.recent_queries && stats.stats.recent_queries.length > 0 && (
         <div className="bg-[#1a1a2e] rounded-2xl border border-gray-700 p-6">
           <h3 className="text-lg font-semibold text-white mb-4">Recent Queries</h3>
@@ -267,7 +261,6 @@ export default function Profile() {
         </div>
       )}
 
-      {/* Password Change Section */}
       <div className="bg-[#1a1a2e] rounded-2xl border border-gray-700 p-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -351,7 +344,6 @@ export default function Profile() {
         )}
       </div>
 
-      {/* Account Info */}
       <div className="bg-[#1a1a2e] rounded-2xl border border-gray-700 p-6">
         <h3 className="text-lg font-semibold text-white mb-4">Account Information</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">

@@ -3,8 +3,7 @@ import axios from 'axios';
 import toast, { Toaster } from 'react-hot-toast';
 import { Send, Loader2, Sparkles, Copy, Check, FileSpreadsheet } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-
-const API_URL = 'https://sql-query-agent-backend.onrender.com';
+import { API_URL } from '../config';
 
 export default function QueryInterface({ databases }) {
   const { token } = useAuth();
@@ -172,7 +171,6 @@ export default function QueryInterface({ databases }) {
 
         {result && (
           <div className="mt-6 space-y-4">
-            {/* SQL Query */}
             <div className="bg-[#1a1a2e] rounded-xl p-4 border border-gray-700">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-medium text-[#6C63FF] flex items-center gap-2">
@@ -190,7 +188,6 @@ export default function QueryInterface({ databases }) {
               </pre>
             </div>
 
-            {/* Results */}
             {result.result && result.result.length > 0 && (
               <div className="border border-gray-700 rounded-xl overflow-hidden">
                 <div className="bg-[#1a1a2e] px-4 py-2 text-sm font-medium text-gray-300 flex items-center justify-between">

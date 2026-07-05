@@ -64,7 +64,6 @@ async def get_user_by_id(user_id: str):
     return await db_get_user_by_id(user_id)
 
 async def update_password(user_id: str, current_password: str, new_password: str):
-    """Update user password"""
     user = await get_user_by_id(user_id)
     if not user:
         raise ValueError("User not found")

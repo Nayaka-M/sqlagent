@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { History, RefreshCw, Search, Clock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-
-const API_URL = 'https://sql-query-agent-backend.onrender.com';
+import { API_URL } from '../config';
 
 export default function LogsPanel() {
   const { token } = useAuth();

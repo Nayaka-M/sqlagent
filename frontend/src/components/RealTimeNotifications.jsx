@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Bell, Check, X, Info, AlertCircle, CheckCircle } from 'lucide-react';
+import { WS_URL } from '../config';
 
 export default function RealTimeNotifications() {
   const { user } = useAuth();
@@ -12,13 +13,11 @@ export default function RealTimeNotifications() {
   useEffect(() => {
     if (!user) return;
 
-    // Connect to WebSocket
-   const ws = new WebSocket(`${import.meta.env.VITE_WS_URL || 'ws://localhost:3001'}/ws/${user.id}`);
+    const ws = new WebSocket(`${WS_URL}/ws/${user.id}`);
     wsRef.current = ws;
 
     ws.onopen = () => {
       console.log('✅ Real-time connected');
-      // Add welcome notification
       addNotification({
         id: Date.now(),
         type: 'success',
@@ -49,7 +48,6 @@ export default function RealTimeNotifications() {
 
     ws.onclose = () => {
       console.log('❌ Real-time disconnected');
-      // Reconnect after 3 seconds
       setTimeout(() => {
         if (wsRef.current?.readyState !== WebSocket.OPEN) {
           console.log('🔄 Reconnecting...');
@@ -104,7 +102,6 @@ export default function RealTimeNotifications() {
 
   return (
     <div className="relative">
-      {/* Bell Icon */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="relative p-2 hover:bg-[#1a1a2e] rounded-xl transition-all"
@@ -117,7 +114,6 @@ export default function RealTimeNotifications() {
         )}
       </button>
 
-      {/* Dropdown */}
       {isOpen && (
         <div className="absolute right-0 mt-2 w-80 max-h-96 bg-[#1a1a2e] border border-gray-700 rounded-xl shadow-2xl overflow-hidden z-50">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">

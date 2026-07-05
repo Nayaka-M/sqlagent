@@ -3,8 +3,7 @@ import { Mail, Send, CheckCircle, User, MessageCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-
-const API_URL = 'http://localhost:3001';
+import { API_URL } from '../config';
 
 export default function Contact() {
   const { user, token } = useAuth();

@@ -13,7 +13,7 @@ export default function Sidebar({ activeTab, setActiveTab }) {
     { id: 'query', label: 'New Query', icon: Sparkles },
     { id: 'history', label: 'History', icon: History },
     { id: 'databases', label: 'Databases', icon: Server },
-    { id: 'profile', label: 'Profile', icon: User },  // ← ADDED
+    { id: 'profile', label: 'Profile', icon: User },
   ];
 
   const featureItems = [
@@ -31,7 +31,6 @@ export default function Sidebar({ activeTab, setActiveTab }) {
 
   return (
     <div className="w-64 min-h-screen bg-[#0F0E17] border-r border-gray-800 flex flex-col sticky top-0">
-      {/* Logo */}
       <div className="px-4 py-6 border-b border-gray-800">
         <div className="flex items-center gap-3">
           <div className="bg-gradient-to-r from-[#6C63FF] to-[#FF6584] p-2 rounded-xl">
@@ -44,7 +43,6 @@ export default function Sidebar({ activeTab, setActiveTab }) {
         </div>
       </div>
 
-      {/* User Profile */}
       <div className="px-4 py-4 border-b border-gray-800">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-gradient-to-r from-[#6C63FF] to-[#FF6584] flex items-center justify-center text-white font-bold text-sm">
@@ -57,9 +55,7 @@ export default function Sidebar({ activeTab, setActiveTab }) {
         </div>
       </div>
 
-      {/* Navigation */}
       <nav className="flex-1 px-3 py-4 overflow-y-auto">
-        {/* Main Section */}
         <div className="mb-6">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 mb-2">Main</p>
           {mainItems.map((item) => (
@@ -73,7 +69,6 @@ export default function Sidebar({ activeTab, setActiveTab }) {
           ))}
         </div>
 
-        {/* Features Section */}
         <div className="mb-6">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 mb-2">Features</p>
           {featureItems.map((item) => (
@@ -87,7 +82,6 @@ export default function Sidebar({ activeTab, setActiveTab }) {
           ))}
         </div>
 
-        {/* Support Section */}
         <div className="mb-6">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 mb-2">Support</p>
           {supportItems.map((item) => (
@@ -101,7 +95,6 @@ export default function Sidebar({ activeTab, setActiveTab }) {
           ))}
         </div>
 
-        {/* Settings & Logout */}
         <div className="border-t border-gray-800 pt-4">
           <SidebarItem
             icon={Settings}
@@ -117,7 +110,6 @@ export default function Sidebar({ activeTab, setActiveTab }) {
         </div>
       </nav>
 
-      {/* Footer */}
       <div className="px-4 py-3 border-t border-gray-800">
         <p className="text-[10px] text-gray-500 text-center">Version 2.0.0</p>
       </div>
@@ -125,7 +117,6 @@ export default function Sidebar({ activeTab, setActiveTab }) {
   );
 }
 
-// Sidebar Item Component
 function SidebarItem({ icon: Icon, label, active, onClick, danger }) {
   return (
     <button

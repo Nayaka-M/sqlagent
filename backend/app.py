@@ -33,6 +33,7 @@ from .models import (
 )
 from .auth import create_user, login_user, verify_token, get_user_by_id, init_auth_db, update_password
 from .query_executor import execute_query
+from .prompts import get_sql_generation_prompt, get_explanation_prompt
 
 load_dotenv()
 
@@ -73,7 +74,7 @@ async def lifespan(app: FastAPI):
     await disconnect_db()
 
 # ============================================================
-# CREATE APP - MUST COME BEFORE ANY @app DECORATORS
+# CREATE APP
 # ============================================================
 app = FastAPI(
     title="SQL Query Agent API",
@@ -190,8 +191,9 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
     return user
 
 # ============================================================
-# AI SQL GENERATION
+# AI SQL GENERATION WITH PROMPT ENGINEERING
 # ============================================================
+
 def generate_sql_fallback(prompt: str, db_id: str = None) -> str:
     p = prompt.lower()
     USER_TABLE = "users"
@@ -213,14 +215,14 @@ def generate_sql_fallback(prompt: str, db_id: str = None) -> str:
     return f"SELECT * FROM {USER_TABLE} LIMIT 20;"
 
 async def generate_sql_with_ai(prompt: str, db_id: str = None) -> str:
+    """Generate SQL using AI with prompt engineering"""
     if not gemini_model:
         return generate_sql_fallback(prompt, db_id)
+    
     try:
-        response = gemini_model.generate_content(
-            f"You are a PostgreSQL expert. Convert this natural language request to SQL.\n"
-            f"Return ONLY the SQL query, no explanation.\n\n"
-            f"Request: {prompt}"
-        )
+        # Use the prompt engineering template
+        full_prompt = get_sql_generation_prompt(prompt)
+        response = gemini_model.generate_content(full_prompt)
         sql = response.text.strip()
         sql = sql.replace('```sql', '').replace('```', '').strip()
         return sql
@@ -232,26 +234,12 @@ async def generate_sql_with_ai(prompt: str, db_id: str = None) -> str:
 # SQL EXPLANATION FUNCTION
 # ============================================================
 async def explain_sql_query(sql_query: str, prompt: str) -> str:
-    """Generate explanation for SQL query"""
+    """Generate explanation using prompt engineering"""
     try:
         if gemini_model:
             try:
-                response = gemini_model.generate_content(
-                    f"""Explain this SQL query in simple terms for a non-technical user.
-
-                    Natural Language Request: {prompt}
-
-                    SQL Query: {sql_query}
-
-                    Please explain:
-                    1. What this query does in plain English
-                    2. What tables it's accessing
-                    3. What data it will return
-                    4. Any important conditions or filters
-
-                    Keep it simple and easy to understand.
-                    """
-                )
+                explanation_prompt = get_explanation_prompt(prompt, sql_query)
+                response = gemini_model.generate_content(explanation_prompt)
                 return response.text.strip()
             except Exception as e:
                 print(f"AI Explanation error: {e}")
@@ -475,7 +463,7 @@ async def root():
     }
 
 # ============================================================
-# AUTH ENDPOINTS - THESE MUST BE HERE
+# AUTH ENDPOINTS
 # ============================================================
 @app.post("/api/auth/register", response_model=UserResponse)
 async def register_user(user_data: UserRegister):

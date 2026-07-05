@@ -1,9 +1,9 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import { API_URL } from '../config';
 
 const AuthContext = createContext();
-const API_URL = 'https://sql-query-agent-backend.onrender.com';
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);

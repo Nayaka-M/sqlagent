@@ -146,7 +146,6 @@ async def get_user_by_id(user_id: str):
 # ============ PROFILE UPDATE FUNCTIONS ============
 
 async def update_user_profile(user_id: str, full_name: str, email: str):
-    """Update user profile information"""
     conn = await get_connection()
     try:
         existing = await conn.fetchrow(
@@ -168,7 +167,6 @@ async def update_user_profile(user_id: str, full_name: str, email: str):
         raise e
 
 async def update_user_password_hash(user_id: str, password_hash: str):
-    """Update user password"""
     conn = await get_connection()
     try:
         await conn.execute(
@@ -182,7 +180,6 @@ async def update_user_password_hash(user_id: str, password_hash: str):
         raise e
 
 async def get_user_profile_stats(user_id: str):
-    """Get complete user statistics"""
     conn = await get_connection()
     try:
         query_count = await conn.fetchrow(
@@ -335,7 +332,6 @@ async def create_log(user_id: str, prompt: str, sql_query: str,
     conn = await get_connection()
     log_id = str(uuid.uuid4())
     
-    # ✅ Convert datetime objects in result to string
     if result:
         for row in result:
             for key, value in row.items():

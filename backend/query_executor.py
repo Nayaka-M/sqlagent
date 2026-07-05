@@ -17,13 +17,11 @@ async def execute_postgresql(config: dict, query: str):
             database=config['database_name']
         )
         
-        # Execute query
         result = await conn.fetch(query)
         await conn.close()
         
         execution_time = int((time.time() - start_time) * 1000)
         
-        # Convert results to JSON - handle all types properly
         data = []
         for row in result:
             row_dict = {}
@@ -41,7 +39,6 @@ async def execute_postgresql(config: dict, query: str):
                 elif isinstance(value, (list, dict)):
                     row_dict[key] = value
                 else:
-                    # Convert anything else to string
                     try:
                         row_dict[key] = str(value)
                     except:
@@ -55,14 +52,13 @@ async def execute_postgresql(config: dict, query: str):
             "execution_time": execution_time
         }
     except Exception as e:
-        print(f"Query execution error: {e}")
+        print(f"❌ Query execution error: {e}")
         return {
             "success": False,
             "error": str(e)
         }
 
 async def execute_query(db_type: str, config: dict, query: str):
-    """Execute query based on database type"""
     if db_type == "postgresql":
         return await execute_postgresql(config, query)
     else:

@@ -71,8 +71,8 @@ class QueryResponse(BaseModel):
     row_count: Optional[int] = None
     execution_time: Optional[int] = None
     error: Optional[str] = None
+    explanation: Optional[str] = None
     message: str = "Query executed successfully!"
-    explanation: Optional[str] = None  # ✅ Added for query explanation
 
 class LogResponse(BaseModel):
     id: str

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Mail, Lock, LogIn } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export default function Login({ onSwitch }) {
   const [email, setEmail] = useState('');
@@ -10,9 +11,13 @@ export default function Login({ onSwitch }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!email || !password) return;
+    if (!email || !password) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+
     setLoading(true);
-    await login(email, password);
+    const result = await login(email, password);
     setLoading(false);
   };
 
