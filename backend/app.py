@@ -645,7 +645,7 @@ async def process_query(
         row_count = 0
         explanation = None
         
-        # ✅ FIX: Handle "All Databases" case
+        # ✅ Case 1: No database selected -> Show explanation only
         if not request.db_id or request.db_id == "all":
             explanation = await explain_sql_query(sql_query, request.prompt)
             
@@ -653,7 +653,7 @@ async def process_query(
                 user_id=current_user["id"],
                 prompt=request.prompt,
                 sql_query=sql_query,
-                result=None,  # ✅ No result data for explanation
+                result=None,
                 error=None,
                 execution_time=None,
                 db_id=None
@@ -663,19 +663,42 @@ async def process_query(
                 success=True,
                 sqlQuery=sql_query,
                 logId=log.id,
-                result=None,  # ✅ No result data
+                result=None,
                 row_count=0,
                 execution_time=None,
                 error=None,
-                explanation=explanation,  # ✅ Show explanation
+                explanation=explanation,
                 message="SQL generated and explained! Select a database to execute."
             )
         
-        # ✅ Execute query if database is selected
+        # ✅ Case 2: Database selected but not connected
         db_config = await get_database_connection(request.db_id, current_user["id"])
         if not db_config:
-            raise HTTPException(status_code=404, detail="Database connection not found")
+            explanation = await explain_sql_query(sql_query, request.prompt)
+            
+            log = await create_log(
+                user_id=current_user["id"],
+                prompt=request.prompt,
+                sql_query=sql_query,
+                result=None,
+                error="Database connection not found",
+                execution_time=None,
+                db_id=request.db_id
+            )
+            
+            return QueryResponse(
+                success=False,
+                sqlQuery=sql_query,
+                logId=log.id,
+                result=None,
+                row_count=0,
+                execution_time=None,
+                error="Database connection not found. Please connect your database first.",
+                explanation=explanation,
+                message="Database not connected. Here's the SQL explanation."
+            )
         
+        # ✅ Case 3: Database connected -> Execute query
         await send_realtime_notification(
             current_user["id"],
             "Executing Query",
@@ -692,7 +715,6 @@ async def process_query(
         if exec_result.get("success"):
             result_data = exec_result.get("data", [])
             
-            # ✅ Ensure result_data is a list
             if isinstance(result_data, str):
                 try:
                     result_data = json.loads(result_data)
