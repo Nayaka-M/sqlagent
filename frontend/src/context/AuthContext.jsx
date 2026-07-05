@@ -3,7 +3,7 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 
 const AuthContext = createContext();
-const API_URL = 'http://localhost:3001';
+const API_URL = 'https://sql-query-agent-backend.onrender.com';
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);

@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { Plus, Server, CheckCircle, Database, Edit2, Trash2, X } from 'lucide-react';
 
-const API_URL = 'http://localhost:3001';
+const API_URL = 'https://sql-query-agent-backend.onrender.com';
 
 export default function DatabaseConnection({ databases, onRefresh }) {
   const { token } = useAuth();
