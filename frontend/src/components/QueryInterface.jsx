@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import axios from 'axios';
 import toast, { Toaster } from 'react-hot-toast';
-import { Send, Loader2, Sparkles, Copy, Check, FileSpreadsheet, Info } from 'lucide-react';
+import { Send, Loader2, Sparkles, Copy, Check, FileSpreadsheet, Info, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../config';
 
@@ -32,20 +32,24 @@ export default function QueryInterface({ databases }) {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       
-      console.log('🔍 API Response:', res.data); // Debug log
+      console.log('🔍 API Response:', res.data);
       
       setResult(res.data);
       
       if (res.data.success) {
         if (res.data.explanation) {
           toast.info('SQL generated and explained!');
-        } else if (res.data.result && res.data.result.length > 0) {
+        } else if (res.data.result && Array.isArray(res.data.result) && res.data.result.length > 0) {
           toast.success(`Query executed! ${res.data.row_count} rows returned`);
         } else {
           toast.info('Query executed successfully! (0 rows)');
         }
       } else {
-        toast.error(res.data.error || 'Query execution failed');
+        if (res.data.error) {
+          toast.error(res.data.error);
+        } else {
+          toast.error('Query execution failed');
+        }
       }
       setPrompt('');
     } catch (err) {
@@ -218,6 +222,17 @@ export default function QueryInterface({ databases }) {
               </div>
             )}
 
+            {/* ✅ Error message when database not connected */}
+            {result.error && !result.explanation && (
+              <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-red-400 font-medium">Error</p>
+                  <p className="text-red-300 text-sm">{result.error}</p>
+                </div>
+              </div>
+            )}
+
             {/* ✅ Results - only when database is selected and data exists */}
             {result.result && !result.explanation && Array.isArray(result.result) && result.result.length > 0 && (
               <div className="border border-gray-700 rounded-xl overflow-hidden">
@@ -277,12 +292,6 @@ export default function QueryInterface({ databases }) {
             {result.result && !result.explanation && Array.isArray(result.result) && result.result.length === 0 && (
               <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 text-yellow-400 text-sm">
                 Query executed successfully! No rows returned.
-              </div>
-            )}
-
-            {result.error && (
-              <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-red-400 text-sm">
-                Error: {result.error}
               </div>
             )}
           </div>

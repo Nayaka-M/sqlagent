@@ -21,7 +21,7 @@ async def get_connection():
 
 async def init_db():
     conn = await get_connection()
-    
+
     await conn.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id TEXT PRIMARY KEY,
@@ -32,7 +32,7 @@ async def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
-    
+
     await conn.execute('''
         CREATE TABLE IF NOT EXISTS tokens (
             token TEXT PRIMARY KEY,
@@ -42,7 +42,7 @@ async def init_db():
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         )
     ''')
-    
+
     await conn.execute('''
         CREATE TABLE IF NOT EXISTS user_databases (
             id TEXT PRIMARY KEY,
@@ -59,7 +59,7 @@ async def init_db():
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         )
     ''')
-    
+
     await conn.execute('''
         CREATE TABLE IF NOT EXISTS query_logs (
             id TEXT PRIMARY KEY,
@@ -75,27 +75,27 @@ async def init_db():
             FOREIGN KEY (db_id) REFERENCES user_databases(id) ON DELETE SET NULL
         )
     ''')
-    
+
     await conn.close()
-    print("✅ PostgreSQL tables created successfully!")
+    print("Γ£à PostgreSQL tables created successfully!")
 
 async def connect_db():
     try:
         await init_db()
-        print("✅ PostgreSQL database connected!")
+        print("Γ£à PostgreSQL database connected!")
     except Exception as e:
-        print(f"❌ Database connection error: {e}")
+        print(f"Γ¥î Database connection error: {e}")
         raise
 
 async def disconnect_db():
-    print("✅ Database disconnected!")
+    print("Γ£à Database disconnected!")
 
 # ============ USER FUNCTIONS ============
 
 async def create_user(username: str, email: str, password_hash: str, full_name: str = None):
     conn = await get_connection()
     user_id = str(uuid.uuid4())
-    
+
     try:
         await conn.execute(
             "INSERT INTO users (id, username, email, password_hash, full_name) VALUES ($1, $2, $3, $4, $5)",
@@ -155,7 +155,7 @@ async def update_user_profile(user_id: str, full_name: str, email: str):
         if existing:
             await conn.close()
             raise ValueError("Email already in use")
-        
+
         await conn.execute(
             "UPDATE users SET full_name = $1, email = $2 WHERE id = $3",
             full_name, email, user_id
@@ -186,26 +186,26 @@ async def get_user_profile_stats(user_id: str):
             "SELECT COUNT(*) as total FROM query_logs WHERE user_id = $1",
             user_id
         )
-        
+
         db_count = await conn.fetchrow(
             "SELECT COUNT(*) as total FROM user_databases WHERE user_id = $1",
             user_id
         )
-        
+
         recent_queries = await conn.fetch(
             "SELECT * FROM query_logs WHERE user_id = $1 ORDER BY created_at DESC LIMIT 10",
             user_id
         )
-        
+
         stats = await conn.fetchrow(
             "SELECT AVG(execution_time) as avg_time FROM query_logs WHERE user_id = $1 AND execution_time IS NOT NULL",
             user_id
         )
-        
+
         user = await get_user_by_id(user_id)
-        
+
         await conn.close()
-        
+
         recent_queries_list = []
         for q in recent_queries:
             q_dict = dict(q)
@@ -217,7 +217,7 @@ async def get_user_profile_stats(user_id: str):
                 except:
                     q_dict['result'] = None
             recent_queries_list.append(q_dict)
-        
+
         return {
             "total_queries": query_count['total'] if query_count else 0,
             "total_databases": db_count['total'] if db_count else 0,
@@ -263,25 +263,25 @@ async def save_database_connection(user_id: str, db_data: dict):
     conn = await get_connection()
     db_id = str(uuid.uuid4())
     encrypted_password = encrypt_password(db_data['password'])
-    
+
     try:
         user_check = await conn.fetchrow("SELECT id FROM users WHERE id = $1", user_id)
         if not user_check:
-            print(f"❌ User {user_id} not found!")
+            print(f"Γ¥î User {user_id} not found!")
             raise ValueError(f"User {user_id} not found")
-        
+
         await conn.execute(
-            '''INSERT INTO user_databases 
+            '''INSERT INTO user_databases
                (id, user_id, db_name, db_type, host, port, username, password, database_name)
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)''',
             db_id, user_id, db_data['db_name'], db_data['db_type'],
             db_data['host'], db_data['port'], db_data['username'],
             encrypted_password, db_data['database_name']
         )
-        print(f"✅ Database connection saved: {db_data['db_name']}")
+        print(f"Γ£à Database connection saved: {db_data['db_name']}")
         return db_id
     except Exception as e:
-        print(f"❌ Error saving database connection: {e}")
+        print(f"Γ¥î Error saving database connection: {e}")
         raise
     finally:
         await conn.close()
@@ -301,10 +301,10 @@ async def get_user_databases(user_id: str):
             if data.get('last_used') and isinstance(data['last_used'], datetime):
                 data['last_used'] = data['last_used'].isoformat()
             result.append(data)
-        print(f"✅ Found {len(result)} databases for user {user_id}")
+        print(f"Γ£à Found {len(result)} databases for user {user_id}")
         return result
     except Exception as e:
-        print(f"❌ Error getting databases: {e}")
+        print(f"Γ¥î Error getting databases: {e}")
         return []
     finally:
         await conn.close()
@@ -326,23 +326,27 @@ async def get_database_connection(db_id: str, user_id: str):
 
 # ============ QUERY LOG FUNCTIONS ============
 
-async def create_log(user_id: str, prompt: str, sql_query: str, 
-                     result: dict = None, error: str = None, 
+async def create_log(user_id: str, prompt: str, sql_query: str,
+                     result: dict = None, error: str = None,
                      execution_time: int = None, db_id: str = None):
     conn = await get_connection()
     log_id = str(uuid.uuid4())
-    
-    if result:
-        for row in result:
+
+    # FIX: result is a dict like {"success": True, "data": [...], "row_count": N, "execution_time": N}
+    # We must iterate over result["data"] (the actual rows), not result itself.
+    # Iterating over `result` directly walked its string keys ("success", "data", etc.)
+    # which caused: 'str' object has no attribute 'items'
+    if result and isinstance(result, dict) and result.get("data"):
+        for row in result["data"]:
             for key, value in row.items():
                 if isinstance(value, datetime):
                     row[key] = value.isoformat()
-    
+
     result_json = json.dumps(result) if result else None
-    
+
     try:
         await conn.execute(
-            '''INSERT INTO query_logs 
+            '''INSERT INTO query_logs
                (id, user_id, db_id, prompt, sql_query, result, error, execution_time)
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)''',
             log_id, user_id, db_id, prompt, sql_query, result_json, error, execution_time
