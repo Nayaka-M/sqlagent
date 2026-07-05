@@ -38,11 +38,11 @@ export default function QueryInterface({ databases }) {
       
       if (res.data.success) {
         if (res.data.explanation) {
-          toast.info('SQL generated and explained!');
+          toast('SQL generated and explained!', { icon: 'ℹ️' });
         } else if (res.data.result && Array.isArray(res.data.result) && res.data.result.length > 0) {
           toast.success(`Query executed! ${res.data.row_count} rows returned`);
         } else {
-          toast.info('Query executed successfully! (0 rows)');
+          toast('Query executed successfully! (0 rows)', { icon: 'ℹ️' });
         }
       } else {
         if (res.data.error) {
